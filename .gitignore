@@ -1,0 +1,6 @@
+marcio.pfx
+senha.txt
+**/node_modules
+**/dist
+**/certificate.pem
+**/private_key.pem
