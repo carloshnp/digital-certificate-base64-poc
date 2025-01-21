@@ -91,6 +91,14 @@ The Node.js TLS module (used in our server) has built-in support for SNI, allowi
 ### TLS Version and Renegotiation Support
 While TLS 1.3 is the latest version of the protocol offering improved security and performance, our implementation specifically uses TLS 1.2 due to a critical feature requirement: the `renegotiate()` method. TLS 1.3 removed support for renegotiation, which is essential for our client certificate authentication flow. This method allows us to request the client certificate after the initial TLS handshake, providing a more flexible authentication mechanism. In TLS 1.3 environments, achieving similar functionality would require implementing a reverse proxy setup or using alternative authentication methods.
 
+## Browser Certificate Handling
+
+When the server sends a certificate request during the TLS handshake, the process involves multiple layers of the browser's architecture. At the network level, the browser (Chrome in our case) processes the TLS handshake message through its network stack implemented in C++, where BoringSSL (Chrome's fork of OpenSSL) handles the cryptographic operations and protocol details. This includes processing the CertificateRequest message that contains the list of acceptable certificate types, CA names, and signature algorithms the server will accept.
+
+The browser then interfaces with the operating system's certificate store through platform-specific APIs. On Windows, Chrome uses the CryptoAPI, specifically functions like `CertOpenSystemStore` and `CertFindCertificatesInStore` to access the Windows Certificate Store, where personal certificates are typically stored in the "MY" store. For other operating systems, similar native APIs are used - macOS utilizes the Keychain Access system, while Linux systems typically use NSS (Network Security Services) or the system's certificate store.
+
+During this process, the browser filters the available certificates based on the server's requirements specified in the CertificateRequest message. It matches the certificates' attributes (such as issuer and key usage) against the server's acceptable CA list and signature algorithms. Only certificates that meet all criteria are presented to the user in the selection dialog. This ensures that only valid certificates that can potentially establish a successful mTLS connection are offered as options to the user.
+
 ## Detailed TLS Handshake Flow
 
 ```mermaid
@@ -140,20 +148,20 @@ sequenceDiagram
 ```
 
 1. **Node.js Server Configuration**
-    - requestCert: true tells the server to request a client certificate during the handshake.
-    - rejectUnauthorized: true forces the server to reject clients without a valid certificate.
+    - `requestCert`: true tells the server to request a client certificate during the handshake.
+    - `rejectUnauthorized`: true forces the server to reject clients without a valid certificate.
 
 2. **ClientHello**
-    - The browser initiates the TLS handshake by sending a ClientHello message with supported TLS versions, cipher suites, and a random value (client random).
+    - The browser initiates the TLS handshake by sending a `ClientHello` message with supported TLS versions, cipher suites, and a random value (client random).
 
 3. **ServerHello**
-    - The server responds with a ServerHello message, selecting the TLS version, cipher suite, and sending a server random.
+    - The server responds with a `ServerHello` message, selecting the TLS version, cipher suite, and sending a server random.
 
 4. **Server Certificate**
     - The server sends its certificate (public key + CA signature) to the browser. The browser validates this certificate against its trusted CA store.
 
 5. **CertificateRequest**
-    - Because requestCert: true, the server sends a CertificateRequest message, listing CAs it trusts for client certificates.
+    - Because `requestCert: true`, the server sends a `CertificateRequest` message, listing CAs it trusts for client certificates.
 
 6. **ServerHelloDone**
     - The server signals it’s done with its part of the handshake.
@@ -168,13 +176,13 @@ sequenceDiagram
     - The browser sends the client’s certificate (if approved).
 
 10. **Client Certificate Verification**
-    - The browser also sends a CertificateVerify message, which is a cryptographic signature proving ownership of the private key associated with the client certificate.
+    - The browser also sends a `CertificateVerify` message, which is a cryptographic signature proving ownership of the private key associated with the client certificate.
 
 11. **ClientKeyExchange**
-    -   The browser sends a ClientKeyExchange message containing the pre-master secret, encrypted with the server’s public key (from the server’s certificate).
+    -   The browser sends a `ClientKeyExchange` message containing the pre-master secret, encrypted with the server’s public key (from the server’s certificate).
 
 12. **Server-Side Validation**
-    - The server validates the client’s certificate using its configured CA (e.g., ca: fs.readFileSync('ca-cert.pem') in Node.js).
+    - The server validates the client’s certificate using its configured CA (e.g., `ca: fs.readFileSync('ca-cert.pem')` in Node.js).
     - If validation fails and rejectUnauthorized: true, the connection is terminated.
 
 13. **Session Keys and Secure Channel**
