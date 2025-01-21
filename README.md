@@ -91,9 +91,104 @@ The Node.js TLS module (used in our server) has built-in support for SNI, allowi
 ### TLS Version and Renegotiation Support
 While TLS 1.3 is the latest version of the protocol offering improved security and performance, our implementation specifically uses TLS 1.2 due to a critical feature requirement: the `renegotiate()` method. TLS 1.3 removed support for renegotiation, which is essential for our client certificate authentication flow. This method allows us to request the client certificate after the initial TLS handshake, providing a more flexible authentication mechanism. In TLS 1.3 environments, achieving similar functionality would require implementing a reverse proxy setup or using alternative authentication methods.
 
+## Detailed TLS Handshake Flow
+
+```mermaid
+sequenceDiagram
+    participant S as Node.js Server
+    participant T as TLS Protocol Layer
+    participant B as Browser
+
+    Note over S: 1. Server configured with requestCert: true
+    
+    Note over S,B: 2. TLS Handshake Initiated by Browser
+    B->>T: ClientHello<br/>(TLS version, cipher suites, client random)
+    
+    Note over S: 3. Server Responds
+    T->>B: ServerHello<br/>(TLS version, cipher suite, server random)
+    
+    Note over S,B: 4. Server Certificate Exchange
+    T->>B: Certificate<br/>(server's public key + CA-signed cert)
+    
+    Note over S,B: 5. Client Certificate Request
+    T->>B: CertificateRequest<br/>(List of trusted CAs)
+    
+    Note over S,B: 6. Server Hello Completion
+    T->>B: ServerHelloDone
+    
+    Note over B: 7. Browser Checks Certificate Store<br/>for client certs issued by CAs<br/>listed in CertificateRequest
+    Note over B: 8. If no valid client cert:<br/>Browser shows dialog to user.<br/>User selects/denies certificate.
+    
+    Note over S,B: 9. Client Certificate Exchange
+    B->>T: Certificate<br/>(Client's public key + CA-signed cert)
+    
+    Note over S,B: 10. Client Certificate Verification
+    B->>T: CertificateVerify<br/>(Signature over handshake messages)
+    
+    Note over S,B: 11. Key Exchange
+    B->>T: ClientKeyExchange<br/>(Encrypted pre-master secret)
+    
+    Note over S: 12. Server Validates Client Cert<br/>using CA certificate<br/>If invalid and rejectUnauthorized: true,<br/>connection is terminated
+    
+    Note over S,B: 13. Session Key Derivation<br/>using client random, server random, pre-master
+    
+    Note over S,B: 14. Switch to Encrypted Communication
+    B->>T: ChangeCipherSpec
+    
+    Note over S,B: 15. Handshake Completion
+    B->>T: Finished<br/>Secure communication begins
+```
+
+1. **Node.js Server Configuration**
+    - requestCert: true tells the server to request a client certificate during the handshake.
+    - rejectUnauthorized: true forces the server to reject clients without a valid certificate.
+
+2. **ClientHello**
+    - The browser initiates the TLS handshake by sending a ClientHello message with supported TLS versions, cipher suites, and a random value (client random).
+
+3. **ServerHello**
+    - The server responds with a ServerHello message, selecting the TLS version, cipher suite, and sending a server random.
+
+4. **Server Certificate**
+    - The server sends its certificate (public key + CA signature) to the browser. The browser validates this certificate against its trusted CA store.
+
+5. **CertificateRequest**
+    - Because requestCert: true, the server sends a CertificateRequest message, listing CAs it trusts for client certificates.
+
+6. **ServerHelloDone**
+    - The server signals it’s done with its part of the handshake.
+
+7. **Browser Certificate Handling**
+    - The browser checks its certificate store (e.g., OS keychain, browser-managed certs) for a client certificate issued by one of the CAs listed in CertificateRequest.
+
+8. **Empty Certificate Store**
+    - If no valid certificate is found, the browser prompts the user to select one (e.g., a .p12 or .pfx file).
+
+9. **Client Certificate**
+    - The browser sends the client’s certificate (if approved).
+
+10. **Client Certificate Verification**
+    - The browser also sends a CertificateVerify message, which is a cryptographic signature proving ownership of the private key associated with the client certificate.
+
+11. **ClientKeyExchange**
+    -   The browser sends a ClientKeyExchange message containing the pre-master secret, encrypted with the server’s public key (from the server’s certificate).
+
+12. **Server-Side Validation**
+    - The server validates the client’s certificate using its configured CA (e.g., ca: fs.readFileSync('ca-cert.pem') in Node.js).
+    - If validation fails and rejectUnauthorized: true, the connection is terminated.
+
+13. **Session Keys and Secure Channel**
+    - Both parties derive symmetric session keys using the client random, server random, and pre-master secret.
+    - The ChangeCipherSpec and Finished messages finalize the handshake, and encrypted communication begins.
 
 
 ## References
+
+- https://goteleport.com/blog/turbo-charge-tls-with-alpn-sni/
+- https://nodejs.org/api/tls.html#alpn-and-sni
+- https://nodejs.org/api/tls.html#tlssocketgetpeercertificatedetailed
+- https://nodejs.org/api/tls.html#tlssocketrenegotiateoptions-callback
+- https://nodejs.org/api/tls.html#class-tlstlssocket
 
 [1]: https://goteleport.com/blog/turbo-charge-tls-with-alpn-sni/
 [2]: https://nodejs.org/api/tls.html#alpn-and-sni
