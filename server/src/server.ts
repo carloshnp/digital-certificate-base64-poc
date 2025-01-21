@@ -26,14 +26,6 @@ app.get('/health', (req: Request, res: Response) => {
 });
 
 app.get('/certificate', (req: Request, res: Response) => {
-
-    // app.use((req, res, next) => {
-    //     res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
-    //     res.set('Pragma', 'no-cache');
-    //     res.set('Expires', '0');
-    //     next();
-    // });
-
     const clientSocket = req.socket as tls.TLSSocket;
 
     clientSocket.renegotiate({requestCert: true, rejectUnauthorized: false}, (err) => {
