@@ -13,9 +13,15 @@ This application demonstrates the process of obtaining a client certificate duri
 
 ## Installation
 
-1. Clone the repository: `git clone https://github.com/yourusername/digital-certificate-base64-poc.git`
+1. Clone the repository: `git clone https://github.com/carloshnp/digital-certificate-base64-poc.git`
 2. Navigate to the project directory: `cd digital-certificate-base64-poc`
 3. Install dependencies: `npm install`
+4. Install both client and server: `npm run install:all`
+
+## Usage
+
+1. Run concurrent dev server and client: `npm run dev`
+2. Open the client in Chrome: `http://localhost:5173`
 
 ## Introduction
 
@@ -188,6 +194,9 @@ sequenceDiagram
 13. **Session Keys and Secure Channel**
     - Both parties derive symmetric session keys using the client random, server random, and pre-master secret.
     - The ChangeCipherSpec and Finished messages finalize the handshake, and encrypted communication begins.
+
+## Intermediate Layer concept
+
 
 
 ## References
