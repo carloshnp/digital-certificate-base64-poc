@@ -1,35 +1,35 @@
-# Digital Certificate Base64 Converter
+# Conversor de Certificado Digital para Base64
 
-This is a simple proof-of-concept (PoC) application that converts a digital certificate into a base64 string and sends it to a server.
+Esta é uma aplicação simples de prova de conceito (PoC) que converte um certificado digital em uma string base64 e a envia para um servidor.
 
-## Description
+## Descrição
 
-This application demonstrates the process of obtaining a client certificate during an mTLS (mutual TLS) handshake. When a client connects, the server initiates a TLS renegotiation [[4]] to request the client certificate. Once the secure connection is established, the server extracts the certificate, converts it to base64 format, and sends it back to the client. This process allows for secure authentication and identification of clients connecting to the server.
+Esta aplicação demonstra o processo de obtenção de um certificado de cliente durante um handshake mTLS (mutual TLS). Quando um cliente se conecta, o servidor inicia uma renegociação TLS [[4]] para solicitar o certificado do cliente. Assim que a conexão segura é estabelecida, o servidor extrai o certificado, o converte para o formato base64 e o envia de volta ao cliente. Esse processo permite a autenticação e identificação segura de clientes que se conectam ao servidor.
 
-## Requirements
+## Requisitos
 
-- Node.js (version 23.6.0 or higher)
-- npm (version 11.0.0 or higher)
-- Python (version 3.10.12 or higher)
+- Node.js (versão 23.6.0 ou superior)
+- npm (versão 11.0.0 ou superior)
+- Python (versão 3.10.12 ou superior)
 
-## Installation
+## Instalação
 
-1. Clone the repository: `git clone https://github.com/carloshnp/digital-certificate-base64-poc.git`
-2. Navigate to the project directory: `cd digital-certificate-base64-poc`
-3. Install dependencies: `npm install`
-4. Install both client and server: `npm run install:all`
+1. Clone o repositório: `git clone https://github.com/carloshnp/digital-certificate-base64-poc.git`
+2. Navegue para o diretório do projeto: `cd digital-certificate-base64-poc`
+3. Instale as dependências: `npm install`
+4. Instale o cliente e o servidor: `npm run install:all`
 
-## Usage
+## Uso
 
-1. Generate certificates in server directory: `cd server && python3 generate_certificate.py` 
-2. Run concurrent dev server and client: `npm run dev`
-3. Open the client in Chrome: `http://localhost:5173`
+1. Gerar certificados no diretório do servidor: `cd server && python3 generate_certificate.py` 
+2. Executar o servidor e o cliente em paralelo: `npm run dev`
+3. Abrir o cliente no Chrome: `http://localhost:5173`
 
-## Introduction
+## Introdução
 
-The mutual TLS (mTLS) handshake in our implementation involves a complex bidirectional authentication between the server and browser. Unlike standard TLS where only the server is authenticated, mTLS requires both parties to present and validate certificates. Using Node.js's `TLSSocket` [[5]], the process involves:
+O handshake mTLS (mutual TLS) nesta implementação envolve uma autenticação bidirecional complexa entre o servidor e o browser. Ao contrário do TLS padrão, o mTLS requer que ambas as partes apresentem e validem certificados. Usando o `TLSSocket` do Node.js [[5]], o fluxo de handshake é:
 
-### TLS Handshake Flow
+### Fluxo do handshake mTLS
 
 ```mermaid
 sequenceDiagram
@@ -50,63 +50,66 @@ sequenceDiagram
 ```
 
 1. **Server-side (Node.js/OpenSSL)**:
-- Uses OpenSSL for TLS implementation
-- Sends certificate request during handshake
-- Validates received certificates
+- Utiliza OpenSSL para a implementação do TLS
+- Envia uma solicitação de certificado durante a renegociação TLS
+- Valida os certificados recebidos
 
 2. **Browser-side (Chrome/BoringSSL)**:
-- Uses BoringSSL (Chrome's OpenSSL fork)
-- Interfaces with OS certificate stores
-- Handles UI for certificate selection
+- Usa o BoringSSL (*fork* do OpenSSL do Chrome)
+- Verifica o armazenamento de certificados do sistema operacional
+- Mostra um dialogo para selecionar o certificado
 
-3. **Operating System**:
-- Manages certificate stores
-- Provides native UI for certificate selection
-- Handles certificate validation
+3. **Sistema Operacional**:
+- Gerencia armazenamentos de certificados
+- Fornece uma interface nativa para o usuário selecionar o certificado
+- Valida os certificados
 
-The entire process is handled at the TLS protocol level, implemented through:
+O processo inteiro é tratado no nível de protocolo TLS, implementado através de:
 - Server: OpenSSL (via Node.js)
 - Browser: BoringSSL (Chrome)
-- OS: Native certificate management APIs
+- OS: APIs de gerenciamento de certificados nativas
 
-## SSL/TLS and SNI Protocols [[1]] [[2]]
+## Protocolos SSL/TLS e SNI [[1]] [[2]]
 
-### SSL and TLS Overview
-SSL (Secure Sockets Layer) and TLS (Transport Layer Security) are cryptographic protocols designed to provide secure communication over computer networks. While SSL was the original protocol developed by Netscape in 1995, TLS is its successor, developed by the IETF in 1999. Today, all SSL versions have been deprecated due to security vulnerabilities, and TLS is the current standard for secure communications.
+### Visão geral do SSL e TLS
 
-In our implementation (see `server/src/server.ts`), we use TLS 1.2 as specified in the server options:
+O SSL (Secure Sockets Layer) e TLS (Transport Layer Security) são protocolos criptograficos desenvolvidos para fornecer comunicação segura sobre redes computacionais. Enquanto o SSL foi o protocolo original desenvolvido pela Netscape em 1995, o TLS é seu sucessor, desenvolvido pela IETF em 1999. Hoje, todas as versões SSL estão fora de uso devido a vulnerabilidades de segurança, e o TLS é o protocolo padrão atual para comunicação segura.
+
+Nesta implementação (veja `server/src/server.ts`), usamos TLS 1.2 como especificado nas opções do servidor:
 ```typescript
 const options: https.ServerOptions = {
     maxVersion: 'TLSv1.2',
-    // ... other options
+    // ... outras opções
 };
 ```
 
 ### Server Name Indication (SNI)
-SNI is a TLS extension that enables a server to safely host multiple TLS certificates for different domains under a single IP address. Here's how it works:
 
-1. During the initial TLS handshake, the client includes the hostname it's trying to reach
-2. This allows the server to select and present the correct certificate for that specific domain
-3. SNI solves the problem of hosting multiple HTTPS websites on a single IP address
+O SNI (Server Name Indication) é uma extensão do TLS que permite que um servidor hospede múltiplos certificados TLS para diferentes domínios em um mesmo IP:
 
-In our implementation, SNI is particularly important when:
-- Multiple certificates need to be managed
-- The server needs to handle connections from different domains
-- Client authentication is required, as demonstrated in our certificate endpoint
+1. Durante o handshake inicial, o cliente inclui o nome do host que está tentando alcancar
+2. Isso permite que o servidor selecione e apresente o certificado correto para esse domínio
+3. O SNI resolve o problema de hospedar múltiplos sites HTTPS em um mesmo IP
 
-The Node.js TLS module (used in our server) has built-in support for SNI, allowing us to efficiently handle secure connections and certificate management.
+Nesta implementação, o SNI é particularmente importante quando:
+- Vários certificados precisam ser gerenciados
+- O servidor precisa lidar com conexões de diferentes domínios
+- A autenticação do cliente é necessária, como demonstrado no endpoint do certificado
 
-### TLS Version and Renegotiation Support [[4]]
+O módulo TLS do Node.js (usado no servidor) tem suporte embutido para o SNI, permitindo uma gestão eficiente de conexões seguras e gerenciamento de certificados.
 
-While TLS 1.3 is the latest version of the protocol offering improved security and performance, our implementation specifically uses TLS 1.2 due to a critical feature requirement: the `renegotiate()` method. TLS 1.3 removed support for renegotiation, which is essential for our client certificate authentication flow. This method allows us to request the client certificate after the initial TLS handshake, providing a more flexible authentication mechanism. In TLS 1.3 environments, achieving similar functionality would require implementing a reverse proxy setup or using alternative authentication methods.
+### Versão do TLS e Suporte à Renegociação [[4]]
 
-## Browser Certificate Handling [[3]]
+Embora o TLS 1.3 seja a versão mais recente do protocolo, oferecendo segurança e desempenho aprimorados, esta implementação usa especificamente o TLS 1.2 devido a um requisito de recurso crítico: o método `renegotiate()`. O TLS 1.3 removeu o suporte à renegociação, que é essencial para o fluxo de autenticação de certificado de cliente. Esse método permite solicitar o certificado do cliente após o handshake TLS inicial, fornecendo um mecanismo de autenticação mais flexível. Em ambientes TLS 1.3, alcançar uma funcionalidade semelhante exigiria a implementação de uma configuração de proxy reverso ou o uso de métodos de autenticação alternativos.
 
-When the server sends a certificate request during the TLS handshake, the process involves multiple layers of the browser's architecture. At the network level, the browser (Chrome in our case) processes the TLS handshake message through its network stack implemented in C++, where BoringSSL (Chrome's fork of OpenSSL) handles the cryptographic operations and protocol details. This includes processing the CertificateRequest message that contains the list of acceptable certificate types, CA names, and signature algorithms the server will accept.
+## Gerenciamento de Certificados pelo Navegador [[3]]
 
-The browser then interfaces with the operating system's certificate store through platform-specific APIs. On Windows, Chrome uses the CryptoAPI, specifically functions like `CertOpenSystemStore` and `CertFindCertificatesInStore` to access the Windows Certificate Store, where personal certificates are typically stored in the "MY" store. For other operating systems, similar native APIs are used - macOS utilizes the Keychain Access system, while Linux systems typically use NSS (Network Security Services) or the system's certificate store.
+Quando o servidor envia uma solicitação de certificado durante o handshake TLS, o processo envolve várias camadas da arquitetura do navegador. No nível da rede, o navegador (Chrome, no caso) processa a mensagem de handshake TLS através de sua pilha de rede implementada em C++, onde o BoringSSL (fork do OpenSSL do Chrome) lida com as operações criptográficas e detalhes do protocolo. Isso inclui o processamento da mensagem CertificateRequest que contém a lista de tipos de certificados aceitáveis, nomes de CAs e algoritmos de assinatura que o servidor aceitará.
 
-During this process, the browser filters the available certificates based on the server's requirements specified in the CertificateRequest message. It matches the certificates' attributes (such as issuer and key usage) against the server's acceptable CA list and signature algorithms. Only certificates that meet all criteria are presented to the user in the selection dialog. This ensures that only valid certificates that can potentially establish a successful mTLS connection are offered as options to the user.
+O navegador então faz interface com o armazenamento de certificados do sistema operacional através de APIs específicas da plataforma. No Windows, o Chrome usa a CryptoAPI, especificamente funções como `CertOpenSystemStore` e `CertFindCertificatesInStore` para acessar o Repositório de Certificados do Windows, onde os certificados pessoais são normalmente armazenados no repositório "MY". Para outros sistemas operacionais, APIs nativas semelhantes são usadas - o macOS utiliza o sistema Keychain Access, enquanto os sistemas Linux normalmente usam o NSS (Network Security Services) ou o armazenamento de certificados do sistema.
+
+Durante esse processo, o navegador filtra os certificados disponíveis com base nos requisitos do servidor especificados na mensagem CertificateRequest. Ele compara os atributos dos certificados (como emissor e uso da chave) com a lista de CAs aceitáveis e algoritmos de assinatura do servidor. Apenas os certificados que atendem a todos os critérios são apresentados ao usuário na caixa de diálogo de seleção. Isso garante que apenas certificados válidos que podem potencialmente estabelecer uma conexão mTLS bem-sucedida sejam oferecidos como opções ao usuário.
+
 
 ## Detailed TLS Handshake Flow
 
@@ -156,69 +159,70 @@ sequenceDiagram
     B->>T: Finished<br/>Secure communication begins
 ```
 
-1. **Node.js Server Configuration**
-    - `requestCert`: true tells the server to request a client certificate during the handshake.
-    - `rejectUnauthorized`: true forces the server to reject clients without a valid certificate.
+1. **Configuração do Servidor Node.js**
+    - `requestCert: true` informa ao servidor para solicitar um certificado de cliente durante o handshake.
+    - `rejectUnauthorized: true` força o servidor a rejeitar clientes sem um certificado válido.
 
 2. **ClientHello**
-    - The browser initiates the TLS handshake by sending a `ClientHello` message with supported TLS versions, cipher suites, and a random value (client random).
+    - O navegador inicia o handshake TLS enviando uma mensagem `ClientHello` com as versões TLS suportadas, suítes de criptografia e um valor aleatório (client random).
 
 3. **ServerHello**
-    - The server responds with a `ServerHello` message, selecting the TLS version, cipher suite, and sending a server random.
+    - O servidor responde com uma mensagem `ServerHello`, selecionando a versão TLS, a suíte de criptografia e enviando um server random.
 
-4. **Server Certificate**
-    - The server sends its certificate (public key + CA signature) to the browser. The browser validates this certificate against its trusted CA store.
+4. **Certificado do Servidor**
+    - O servidor envia seu certificado (chave pública + assinatura da CA) para o navegador. O navegador valida este certificado em relação ao seu repositório de CAs confiáveis.
 
 5. **CertificateRequest**
-    - Because `requestCert: true`, the server sends a `CertificateRequest` message, listing CAs it trusts for client certificates.
+    - Como `requestCert: true`, o servidor envia uma mensagem `CertificateRequest`, listando as CAs nas quais confia para certificados de cliente.
 
 6. **ServerHelloDone**
-    - The server signals it’s done with its part of the handshake.
+    - O servidor sinaliza que terminou sua parte do handshake.
 
-7. **Browser Certificate Handling** [[3]]
-    - The browser checks its certificate store (e.g., OS keychain, browser-managed certs) for a client certificate issued by one of the CAs listed in CertificateRequest.
+7. **Gerenciamento de Certificados pelo Navegador** [[3]]
+    - O navegador verifica seu repositório de certificados (por exemplo, *keychain* do SO, certificados gerenciados pelo navegador) em busca de um certificado de cliente emitido por uma das CAs listadas em `CertificateRequest`.
 
-8. **Empty Certificate Store**
-    - If no valid certificate is found, the browser prompts the user to select one (e.g., a .p12 or .pfx file).
+8. **Repositório de Certificados Vazio**
+    - Se nenhum certificado válido for encontrado, o navegador solicita ao usuário que selecione um (por exemplo, um arquivo .p12 ou .pfx).
 
-9. **Client Certificate**
-    - The browser sends the client’s certificate (if approved).
+9. **Certificado do Cliente**
+    - O navegador envia o certificado do cliente (se aprovado).
 
-10. **Client Certificate Verification**
-    - The browser also sends a `CertificateVerify` message, which is a cryptographic signature proving ownership of the private key associated with the client certificate.
+10. **Verificação do Certificado do Cliente**
+    - O navegador também envia uma mensagem `CertificateVerify`, que é uma assinatura criptográfica que comprova a posse da chave privada associada ao certificado do cliente.
 
 11. **ClientKeyExchange**
-    -   The browser sends a `ClientKeyExchange` message containing the pre-master secret, encrypted with the server’s public key (from the server’s certificate).
+    - O navegador envia uma mensagem `ClientKeyExchange` contendo o *pre-master secret*, criptografado com a chave pública do servidor (do certificado do servidor).
 
-12. **Server-Side Validation**
-    - The server validates the client’s certificate using its configured CA (e.g., `ca: fs.readFileSync('ca-cert.pem')` in Node.js).
-    - If validation fails and rejectUnauthorized: true, the connection is terminated.
+12. **Validação no Lado do Servidor**
+    - O servidor valida o certificado do cliente usando sua CA configurada (por exemplo, `ca: fs.readFileSync('ca-cert.pem')` no Node.js).
+    - Se a validação falhar e `rejectUnauthorized: true`, a conexão é encerrada.
 
-13. **Session Keys and Secure Channel**
-    - Both parties derive symmetric session keys using the client random, server random, and pre-master secret.
-    - The ChangeCipherSpec and Finished messages finalize the handshake, and encrypted communication begins.
+13. **Session Keys e Secure Channel**
+    - Ambas as partes derivam chaves de sessão simétricas usando o *client random*, *server random* e *pre-master secret*.
+    - As mensagens `ChangeCipherSpec` e `Finished` finalizam o handshake, e a comunicação criptografada é iniciada.
 
-## Intermediate Layer Concept
+## Arquitetura de Camada Intermediária
 
-The intermediate layer implementation serves as a bridge between the client and the target server (Receita Federal), handling certificate management and session maintenance. This architecture abstracts the complexity of direct certificate handling from the target server, reducing the storage of sensitive certificate data, and maintaining persistent sessions through token-based authentication.
+A implementação da camada intermediária serve como uma ponte entre o cliente e o servidor de destino (Receita Federal), gerenciando certificados e mantendo sessões. Essa arquitetura abstrai a complexidade do gerenciamento direto de certificados do servidor de destino, reduzindo o armazenamento de dados sensíveis de certificados e mantendo sessões persistentes por meio de autenticação baseada em token.
 
-### Implementation Overview
+### Visão Geral da Implementação
 
-The IIS server acts as an intermediate layer with two distinct handshake processes:
+O servidor IIS atua como uma camada intermediária com dois processos de handshake distintos:
 
-1. **Client-to-IIS Handshake**: 
-   - Handles the initial mTLS connection with the client
-   - Extracts and converts the client's certificate to base64 format
-   - Manages the client session using the token received from the target server
+1. **Handshake Client-to-IIS**:
+    - Lida com a conexão mTLS inicial com o cliente
+    - Extrai e converte o certificado do cliente para o formato base64
+    - Gerencia a sessão do cliente usando o token recebido do servidor de destino
 
-2. **IIS-to-Target Handshake**:
-   - Establishes a secure connection with Receita Federal's server
-   - Forwards the base64 certificate for validation
-   - Receives and stores the authentication token for subsequent requests
+2. **Handshake IIS-to-Target**:
+    - Estabelece uma conexão segura com o servidor da Receita Federal
+    - Encaminha o certificado em base64 para validação
+    - Recebe e armazena o token de autenticação para requisições subsequentes
 
-This approach allows the intermediate server to act as an abstraction layer, maintaining the session state with both the client and the target server while minimizing certificate storage and handling requirements.
+Essa abordagem permite que o servidor intermediário atue como uma camada de abstração, mantendo o estado da sessão tanto com o cliente quanto com o servidor de destino, enquanto minimiza os requisitos de armazenamento e gerenciamento de certificados.
 
-### Authentication Flow
+
+### Fluxo de Autenticação
 
 ```mermaid
 sequenceDiagram
@@ -249,24 +253,15 @@ sequenceDiagram
     I->>C: 13. Forward Response to Client
 ```
 
-### Key Benefits
+### Considerações finais
 
-1. **Security Enhancement**:
-   - Certificates are only transmitted during initial authentication
-   - Subsequent communications use tokens instead of certificates
-   - Reduced exposure of sensitive certificate data
+- Os certificados são transmitidos apenas durante a autenticação inicial.
+- As comunicações subsequentes usam tokens em vez de certificados.
+- A autenticação é baseada em token para manter as sessões.
+- Não há necessidade de armazenar ou gerenciar certificados após o handshake inicial.
+- O servidor IIS lida com toda a complexidade relacionada a certificados.
 
-2. **Efficient Session Management**:
-   - Token-based authentication for maintaining sessions
-   - No need to store or manage certificates after initial handshake
-   - Reduced load on the target server
-
-3. **Abstraction Layer**:
-   - IIS server handles all certificate-related complexity
-   - Simplified interface for client applications
-   - Centralized point for security policy enforcement
-
-## References
+## Referências
 
 - https://goteleport.com/blog/turbo-charge-tls-with-alpn-sni/
 - https://nodejs.org/api/tls.html#alpn-and-sni
