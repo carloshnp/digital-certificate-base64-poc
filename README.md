@@ -4,7 +4,7 @@ This is a simple proof-of-concept (PoC) application that converts a digital cert
 
 ## Description
 
-This application demonstrates the process of obtaining a client certificate during an mTLS (mutual TLS) handshake. When a client connects, the server initiates a TLS renegotiation to request the client certificate. Once the secure connection is established, the server extracts the certificate, converts it to base64 format, and sends it back to the client. This process allows for secure authentication and identification of clients connecting to the server.
+This application demonstrates the process of obtaining a client certificate during an mTLS (mutual TLS) handshake. When a client connects, the server initiates a TLS renegotiation [[4]] to request the client certificate. Once the secure connection is established, the server extracts the certificate, converts it to base64 format, and sends it back to the client. This process allows for secure authentication and identification of clients connecting to the server.
 
 ## Requirements
 
@@ -20,8 +20,9 @@ This application demonstrates the process of obtaining a client certificate duri
 
 ## Usage
 
-1. Run concurrent dev server and client: `npm run dev`
-2. Open the client in Chrome: `http://localhost:5173`
+1. Generate certificates in server directory: `cd server && python3 generate_certificate.py` 
+2. Run concurrent dev server and client: `npm run dev`
+3. Open the client in Chrome: `http://localhost:5173`
 
 ## Introduction
 
@@ -67,7 +68,7 @@ The entire process is handled at the TLS protocol level, implemented through:
 - Browser: BoringSSL (Chrome)
 - OS: Native certificate management APIs
 
-## SSL/TLS and SNI Protocols
+## SSL/TLS and SNI Protocols [[1]] [[2]]
 
 ### SSL and TLS Overview
 SSL (Secure Sockets Layer) and TLS (Transport Layer Security) are cryptographic protocols designed to provide secure communication over computer networks. While SSL was the original protocol developed by Netscape in 1995, TLS is its successor, developed by the IETF in 1999. Today, all SSL versions have been deprecated due to security vulnerabilities, and TLS is the current standard for secure communications.
@@ -94,10 +95,11 @@ In our implementation, SNI is particularly important when:
 
 The Node.js TLS module (used in our server) has built-in support for SNI, allowing us to efficiently handle secure connections and certificate management.
 
-### TLS Version and Renegotiation Support
+### TLS Version and Renegotiation Support [[4]]
+
 While TLS 1.3 is the latest version of the protocol offering improved security and performance, our implementation specifically uses TLS 1.2 due to a critical feature requirement: the `renegotiate()` method. TLS 1.3 removed support for renegotiation, which is essential for our client certificate authentication flow. This method allows us to request the client certificate after the initial TLS handshake, providing a more flexible authentication mechanism. In TLS 1.3 environments, achieving similar functionality would require implementing a reverse proxy setup or using alternative authentication methods.
 
-## Browser Certificate Handling
+## Browser Certificate Handling [[3]]
 
 When the server sends a certificate request during the TLS handshake, the process involves multiple layers of the browser's architecture. At the network level, the browser (Chrome in our case) processes the TLS handshake message through its network stack implemented in C++, where BoringSSL (Chrome's fork of OpenSSL) handles the cryptographic operations and protocol details. This includes processing the CertificateRequest message that contains the list of acceptable certificate types, CA names, and signature algorithms the server will accept.
 
@@ -172,7 +174,7 @@ sequenceDiagram
 6. **ServerHelloDone**
     - The server signals it’s done with its part of the handshake.
 
-7. **Browser Certificate Handling**
+7. **Browser Certificate Handling** [[3]]
     - The browser checks its certificate store (e.g., OS keychain, browser-managed certs) for a client certificate issued by one of the CAs listed in CertificateRequest.
 
 8. **Empty Certificate Store**
@@ -195,9 +197,73 @@ sequenceDiagram
     - Both parties derive symmetric session keys using the client random, server random, and pre-master secret.
     - The ChangeCipherSpec and Finished messages finalize the handshake, and encrypted communication begins.
 
-## Intermediate Layer concept
+## Intermediate Layer Concept
 
+The intermediate layer implementation serves as a bridge between the client and the target server (Receita Federal), handling certificate management and session maintenance. This architecture abstracts the complexity of direct certificate handling from the target server, reducing the storage of sensitive certificate data, and maintaining persistent sessions through token-based authentication.
 
+### Implementation Overview
+
+The IIS server acts as an intermediate layer with two distinct handshake processes:
+
+1. **Client-to-IIS Handshake**: 
+   - Handles the initial mTLS connection with the client
+   - Extracts and converts the client's certificate to base64 format
+   - Manages the client session using the token received from the target server
+
+2. **IIS-to-Target Handshake**:
+   - Establishes a secure connection with Receita Federal's server
+   - Forwards the base64 certificate for validation
+   - Receives and stores the authentication token for subsequent requests
+
+This approach allows the intermediate server to act as an abstraction layer, maintaining the session state with both the client and the target server while minimizing certificate storage and handling requirements.
+
+### Authentication Flow
+
+```mermaid
+sequenceDiagram
+    participant C as Client (Browser)
+    participant I as IIS Server<br/>(Intermediate)
+    participant R as Receita Federal<br/>(Target Server)
+    
+    Note over C,I: First Handshake
+    C->>I: 1. Initiate mTLS Connection
+    I->>C: 2. Request Client Certificate
+    C->>I: 3. Send Certificate
+    
+    Note over I: 4. Extract & Convert<br/>Certificate to Base64
+    
+    Note over I,R: Second Handshake
+    I->>R: 5. Forward Base64 Certificate
+    R->>R: 6. Validate Certificate
+    R->>I: 7. Return Authentication Token
+    
+    Note over I: 8. Store Token for<br/>Session Management
+    
+    I->>C: 9. Connection Established
+    
+    Note over C,R: Subsequent Requests
+    C->>I: 10. Client Request
+    I->>R: 11. Forward Request with Token
+    R->>I: 12. Response
+    I->>C: 13. Forward Response to Client
+```
+
+### Key Benefits
+
+1. **Security Enhancement**:
+   - Certificates are only transmitted during initial authentication
+   - Subsequent communications use tokens instead of certificates
+   - Reduced exposure of sensitive certificate data
+
+2. **Efficient Session Management**:
+   - Token-based authentication for maintaining sessions
+   - No need to store or manage certificates after initial handshake
+   - Reduced load on the target server
+
+3. **Abstraction Layer**:
+   - IIS server handles all certificate-related complexity
+   - Simplified interface for client applications
+   - Centralized point for security policy enforcement
 
 ## References
 
