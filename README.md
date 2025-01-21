@@ -10,6 +10,7 @@ This application demonstrates the process of obtaining a client certificate duri
 
 - Node.js (version 23.6.0 or higher)
 - npm (version 11.0.0 or higher)
+- Python (version 3.10.12 or higher)
 
 ## Installation
 
