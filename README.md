@@ -22,7 +22,7 @@ Esta aplicação demonstra o processo de obtenção de um certificado de cliente
 ## Uso
 
 1. Gerar certificados no diretório do servidor: `cd server && python3 generate_certificate.py` 
-2. Executar o servidor e o cliente em paralelo: `npm run dev`
+2. Executar o servidor e o cliente em paralelo: `cd .. && npm run dev`
 3. Abrir o cliente no Chrome: `http://localhost:5173`
 
 ## Introdução
